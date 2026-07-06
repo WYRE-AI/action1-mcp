@@ -138,6 +138,21 @@ async function startHttp(): Promise<void> {
   const port = Number(process.env.PORT ?? 8080);
 
   createServer((req: IncomingMessage, res: ServerResponse) => {
+    // Liveness probe: must answer 200 unconditionally, before any MCP/credential
+    // handling — the ACA probe GETs /health with no credentials or Accept
+    // headers, and anything non-2xx crash-loops the container.
+    if (req.url === "/health" || req.url?.startsWith("/health?")) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          status: "ok",
+          transport: "http",
+          timestamp: new Date().toISOString(),
+        }),
+      );
+      return;
+    }
+
     // Build a FRESH Server + Transport per request in stateless mode.
     //
     // A single shared stateful transport (sessionIdGenerator set) accepts

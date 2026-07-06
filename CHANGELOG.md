@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- Added an unconditional `200` `/health` liveness route to the HTTP transport. The server
+  previously had no `/health` endpoint at all, so the Azure Container Apps liveness probe
+  (`GET /health`, no credentials/Accept headers) fell through to the MCP transport, got a
+  non-2xx response, and crash-looped the container every ~90 seconds.
 - HTTP transport now builds a fresh `Server` + `StreamableHTTPServerTransport` per `/mcp` request in stateless mode (no `sessionIdGenerator`), instead of sharing one stateful transport across all requests. The shared stateful transport accepted only one `initialize` per container lifetime, so behind the multi-user gateway every client after the first received `-32600 "Server already initialized"` and saw 0 tools until a restart. Per-request servers are created inside the `runWithCredentials` context and disposed on response close, and the request handler is now wrapped so a failure returns a JSON-RPC `-32603` 500 instead of escaping as an unhandled rejection.
 - Corrected Action1 REST API paths in `src/sdk/action1-client.ts`: OAuth token endpoint now uses the `/api/3.0/oauth2/token` prefix, and the endpoints/updates/policies resource paths now match the real API (`/endpoints/managed/{org}`, `/updates/{org}`, `/policies/instances/{org}`). Previously every tool call 403'd at the token request. (#22)
 - `pack:mcpb` / `validate:mcpb` now invoke `@anthropic-ai/mcpb` instead of the non-existent bare `mcpb` npm package.
