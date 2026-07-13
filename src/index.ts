@@ -29,7 +29,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { getDomainHandler, getAvailableDomains } from "./domains/index.js";
 import { isDomainName } from "./utils/types.js";
-import { runWithCredentials, type Action1Credentials, type Action1Region } from "./utils/client.js";
+import {
+  cleanCredential,
+  runWithCredentials,
+  type Action1Credentials,
+  type Action1Region,
+} from "./utils/client.js";
 
 const navigateTool: Tool = {
   name: "action1_navigate",
@@ -126,11 +131,14 @@ function credentialsFromHeaders(req: IncomingMessage): Action1Credentials | null
   const region = req.headers["x-action1-region"];
   const defaultOrgId = req.headers["x-action1-default-org-id"];
   if (typeof apiKey !== "string" || typeof secret !== "string") return null;
+  // cleanCredential strips blank / unresolved `${user_config.X}` placeholders so
+  // a blank optional field reads as absent (region falls back, org id stays unset).
   return {
     apiKey,
     secret,
-    region: (typeof region === "string" ? region : "NorthAmerica") as Action1Region,
-    defaultOrgId: typeof defaultOrgId === "string" ? defaultOrgId : undefined,
+    region: (cleanCredential(typeof region === "string" ? region : undefined) ??
+      "NorthAmerica") as Action1Region,
+    defaultOrgId: cleanCredential(typeof defaultOrgId === "string" ? defaultOrgId : undefined),
   };
 }
 
