@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- Credential resolution now ignores unresolved MCPB `${user_config.X}` placeholders for the
+  optional `ACTION1_REGION` and `ACTION1_DEFAULT_ORG_ID` fields (env and gateway-header paths).
+  When an optional user_config field is left blank, Claude Desktop injects the literal template
+  string into the env var rather than omitting it. A blank `ACTION1_DEFAULT_ORG_ID` previously
+  became a real org id: it was `encodeURIComponent`-ed into the request path (→ 404) and defeated
+  the "organization_id is required" guard, and a blank `ACTION1_REGION` would throw "Unknown
+  Action1 region". A new `cleanCredential` helper strips blank/whitespace/placeholder values so
+  they read as absent. Mirrors itglue-mcp #73.
 - Added an unconditional `200` `/health` liveness route to the HTTP transport. The server
   previously had no `/health` endpoint at all, so the Azure Container Apps liveness probe
   (`GET /health`, no credentials/Accept headers) fell through to the MCP transport, got a

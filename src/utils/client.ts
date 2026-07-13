@@ -28,14 +28,29 @@ export function runWithCredentials<T>(creds: Action1Credentials, fn: () => T): T
   return credentialStore.run(creds, fn);
 }
 
+// MCPB/DXT desktop bundles map env vars to `${user_config.X}` in manifest.json.
+// When an OPTIONAL user_config field is left blank, the desktop host injects the
+// literal template string (e.g. `${user_config.action1_default_org_id}`) into the
+// env var rather than omitting it, so `??` never fires and the placeholder is used
+// as a real value — a blank org id becomes a 404 and defeats the "org id required"
+// guard. Strip those here so a blank field reads as absent. (issue #73 pattern)
+const CONFIG_PLACEHOLDER = /^\$\{.*\}$/;
+
+/** Strip empty/whitespace and unresolved MCPB "${user_config.X}" placeholders (issue #73 pattern). */
+export function cleanCredential(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || CONFIG_PLACEHOLDER.test(trimmed)) return undefined;
+  return trimmed;
+}
+
 export function getCredentials(): Action1Credentials | null {
   const perRequest = credentialStore.getStore();
   if (perRequest) return perRequest;
 
   const apiKey = process.env.ACTION1_API_KEY;
   const secret = process.env.ACTION1_SECRET;
-  const region = (process.env.ACTION1_REGION ?? "NorthAmerica") as Action1Region;
-  const defaultOrgId = process.env.ACTION1_DEFAULT_ORG_ID;
+  const region = (cleanCredential(process.env.ACTION1_REGION) ?? "NorthAmerica") as Action1Region;
+  const defaultOrgId = cleanCredential(process.env.ACTION1_DEFAULT_ORG_ID);
 
   if (!apiKey || !secret) return null;
   return { apiKey, secret, region, defaultOrgId };
