@@ -28,6 +28,7 @@ import {
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { getDomainHandler, getAvailableDomains } from "./domains/index.js";
+import { registerResourceHandlers } from "./resources.js";
 import { isDomainName } from "./utils/types.js";
 import {
   cleanCredential,
@@ -105,8 +106,10 @@ async function dispatchTool(
 function buildServer(): Server {
   const server = new Server(
     { name: "action1-mcp", version: "0.1.0" },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: {} } },
   );
+  // MCP Apps (SEP-1865): serves the ui:// device-card resource.
+  registerResourceHandlers(server);
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: await listAllTools(),
   }));

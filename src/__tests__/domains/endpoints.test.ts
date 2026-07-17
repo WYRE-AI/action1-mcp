@@ -93,10 +93,10 @@ describe("endpoints domain", () => {
       });
 
       expect(getEndpoint).toHaveBeenCalledWith("e1", { orgId: "org-1" });
-      expect(JSON.parse(result.content[0].text)).toEqual({
-        id: "e1",
-        hostname: "host-a",
-      });
+      const body = JSON.parse(result.content[0].text);
+      expect(body).toMatchObject({ id: "e1", hostname: "host-a" });
+      // MCP Apps: the normalized _card is additive (see mcp-apps.test.ts).
+      expect(body._card).toMatchObject({ id: "e1", name: "host-a" });
     });
   });
 });
