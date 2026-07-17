@@ -8,6 +8,7 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { DomainHandler } from "../utils/types.js";
 import { getClient } from "../utils/client.js";
+import { buildDeviceCard, DEVICE_CARD_META } from "../card.builder.js";
 
 const tools: Tool[] = [
   {
@@ -38,6 +39,7 @@ const tools: Tool[] = [
     description:
       "Get a single endpoint by id, with full detail: hardware, installed agent version, " +
       "last contact, group memberships, custom attributes.",
+    _meta: DEVICE_CARD_META,
     inputSchema: {
       type: "object",
       properties: {
@@ -81,8 +83,23 @@ export const endpointsHandler: DomainHandler = {
       }
       const orgId = (args.organization_id as string | undefined) ?? undefined;
       const endpoint = await client.getEndpoint(endpointId, { orgId });
+
+      // MCP Apps: attach the normalized card payload the ui:// device card
+      // renders from. Best-effort — any failure just means no UI surface,
+      // never a failed tool result.
+      let payload: unknown = endpoint;
+      try {
+        if (endpoint && typeof endpoint === "object" && !Array.isArray(endpoint)) {
+          const record = endpoint as Record<string, unknown>;
+          const card = buildDeviceCard(record);
+          if (card) payload = { ...record, _card: card };
+        }
+      } catch {
+        payload = endpoint;
+      }
+
       return {
-        content: [{ type: "text", text: JSON.stringify(endpoint, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     }
 

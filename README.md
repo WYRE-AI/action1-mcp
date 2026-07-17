@@ -20,6 +20,17 @@ Read-only in v1. Deploy / automation surface is intentionally separated to a lat
 
 API surface maps to [PSAction1](https://github.com/Action1Corp/PSAction1) (Action1's MIT-licensed PowerShell module). When the v1 surface earns its keep, write tools (deploy, requery, package upload) come in v2 behind separate review.
 
+### Interactive Device Card (MCP Apps)
+
+`action1_get_endpoint` renders as an interactive device-summary card in MCP
+Apps hosts (Claude Desktop/web) — status, OS, user, IP, agent version,
+reboot-required, and missing-update counts at a glance; plain-JSON behavior is
+unchanged in other hosts. The card is read-only (matching the v1 tool surface),
+neutral by default, and brandable via `window.__BRAND__` injection or
+`MCP_BRAND_*` env vars (`MCP_BRAND_NAME`, `MCP_BRAND_LOGO_URL`,
+`MCP_BRAND_PRIMARY_COLOR`, `MCP_BRAND_ACCENT_COLOR`, `MCP_BRAND_BG`,
+`MCP_BRAND_TEXT`) — no rebuild needed.
+
 ## Usage
 
 ### Claude Desktop (MCPB)
@@ -60,6 +71,10 @@ Per-request credentials via headers:
 ```
 src/
 ├── index.ts                  # stdio + HTTP transports, tool dispatch
+├── card.builder.ts           # MCP Apps device-card normalization + brand injection
+├── resources.ts              # resources/list + resources/read (ui:// device card)
+├── generated/
+│   └── device-card-html.ts   # committed vite single-file bundle (npm run build:ui)
 ├── sdk/
 │   └── action1-client.ts     # embedded REST + OAuth client (factor-out candidate
 │                             # if surface crosses ~20 tools / 2+ domains)
@@ -71,7 +86,8 @@ src/
 │   ├── endpoints.ts
 │   ├── policies.ts
 │   └── updates.ts
-└── __tests__/domains/        # one test per domain
+└── __tests__/                # domain tests + MCP Apps contract tests
+ui/                           # device-card source (index.html + device-card.ts)
 ```
 
 Per-request credential isolation via `AsyncLocalStorage` — concurrent requests in HTTP mode never share credentials through `process.env`.
