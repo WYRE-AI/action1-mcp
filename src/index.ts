@@ -36,6 +36,7 @@ import {
   type Action1Credentials,
   type Action1Region,
 } from "./utils/client.js";
+import { verifyS2sHeader, S2S_HEADER } from "./s2s-verify.js";
 
 const navigateTool: Tool = {
   name: "action1_navigate",
@@ -162,6 +163,29 @@ async function startHttp(): Promise<void> {
         }),
       );
       return;
+    }
+
+    // Gateway S2S verification (gateway#377 parity). Runs before any
+    // credential extraction — see src/s2s-verify.ts. There's no separate
+    // /mcp route check in this server (everything past /health is MCP
+    // traffic), so this guard covers all of it. Empty secret means S2S
+    // enforcement isn't provisioned for this vendor yet, so we don't call
+    // verifyS2sHeader at all (dark-by-default).
+    const s2sSecret = process.env.CONDUIT_S2S_SECRET ?? "";
+    if (s2sSecret) {
+      const s2sHeader = req.headers[S2S_HEADER] as string | undefined;
+      if (!verifyS2sHeader(s2sHeader, s2sSecret)) {
+        console.error("action1-mcp: rejected request with missing/invalid gateway S2S header");
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: { code: -32001, message: "Unauthorized: missing or invalid gateway S2S authentication header" },
+            id: null,
+          }),
+        );
+        return;
+      }
     }
 
     // Build a FRESH Server + Transport per request in stateless mode.
