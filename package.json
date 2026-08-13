@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/wyre-technology/action1-mcp#readme",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0"
+    "@modelcontextprotocol/sdk": "^1.30.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
