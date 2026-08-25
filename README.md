@@ -35,7 +35,7 @@ neutral by default, and brandable via `window.__BRAND__` injection or
 
 ### Claude Desktop (MCPB)
 
-Install via the MCPB bundle from the [latest release](https://github.com/wyre-technology/action1-mcp/releases).
+Install via the MCPB bundle from the [latest release](https://github.com/WYRE-AI/action1-mcp/releases).
 
 Required credentials (created in Action1 → Settings → API Credentials, **non-recoverable on creation — copy immediately**):
 - API Key (Client ID)
@@ -50,14 +50,14 @@ ACTION1_API_KEY=... \
 ACTION1_SECRET=... \
 ACTION1_REGION=NorthAmerica \
 ACTION1_DEFAULT_ORG_ID=org-... \
-npx -y github:wyre-technology/action1-mcp
+npx -y github:WYRE-AI/action1-mcp
 ```
 
 ### HTTP (gateway mode)
 
 ```bash
 MCP_TRANSPORT=http PORT=8080 AUTH_MODE=gateway \
-  docker run -p 8080:8080 ghcr.io/wyre-technology/action1-mcp:latest
+  docker run -p 8080:8080 ghcr.io/wyre-ai/action1-mcp:latest
 ```
 
 Per-request credentials via headers:

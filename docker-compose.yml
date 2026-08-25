@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: ghcr.io/wyre-technology/action1-mcp:latest
+    image: ghcr.io/wyre-ai/action1-mcp:latest
     container_name: action1-mcp-server
     restart: unless-stopped
     ports:
