@@ -1,5 +1,5 @@
 {
-  "name": "@wyre-technology/action1-mcp",
+  "name": "@wyre-ai/action1-mcp",
   "version": "0.1.0",
   "description": "Action1 MCP server — patch management, endpoint inventory, and policy automation for Claude",
   "type": "module",
@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wyre-technology/action1-mcp.git"
+    "url": "git+https://github.com/WYRE-AI/action1-mcp.git"
   },
   "keywords": [
     "mcp",
@@ -39,9 +39,9 @@
   "author": "Wyre Technology",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/wyre-technology/action1-mcp/issues"
+    "url": "https://github.com/WYRE-AI/action1-mcp/issues"
   },
-  "homepage": "https://github.com/wyre-technology/action1-mcp#readme",
+  "homepage": "https://github.com/WYRE-AI/action1-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0"
   },

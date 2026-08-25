@@ -2,7 +2,7 @@
  * Action1 REST API client — embedded in action1-mcp for v1.
  *
  * Lives in src/sdk/ (not src/utils/) so the eventual factor-out to
- * @wyre-technology/node-action1 is a `git mv src/sdk/ → new-repo/src/` rather
+ * @wyre-ai/node-action1 is a `git mv src/sdk/ → new-repo/src/` rather
  * than code archaeology. See playbook §"embed vs separate-SDK is a size-class
  * decision" for the rule.
  *

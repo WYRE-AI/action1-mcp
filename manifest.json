@@ -5,9 +5,9 @@
   "version": "0.0.0",
   "description": "MCP server for Action1 — endpoint inventory, patch visibility, and policy automation via the Model Context Protocol",
   "long_description": "Provides AI assistants with structured read access to Action1 RMM data: organizations, endpoints, missing OS/application updates, and policies. Multi-region (NorthAmerica / Europe / AsiaPacific / Australia). Multi-org via MSP credentials. Read-only in v1 — deploy/automation surface is intentionally separate for blast-radius reasons.",
-  "author": { "name": "Wyre Technology", "url": "https://github.com/wyre-technology" },
-  "repository": { "type": "git", "url": "https://github.com/wyre-technology/action1-mcp" },
-  "homepage": "https://github.com/wyre-technology/action1-mcp",
+  "author": { "name": "Wyre Technology", "url": "https://github.com/WYRE-AI" },
+  "repository": { "type": "git", "url": "https://github.com/WYRE-AI/action1-mcp" },
+  "homepage": "https://github.com/WYRE-AI/action1-mcp",
   "license": "Apache-2.0",
   "keywords": ["action1", "rmm", "patch-management", "endpoint-management", "msp", "mcp"],
   "server": {

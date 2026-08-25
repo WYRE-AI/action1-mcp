@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.wyre-technology/action1-mcp",
+  "name": "io.github.WYRE-AI/action1-mcp",
   "title": "Action1",
   "description": "Action1 MCP server — endpoint inventory, patch visibility, and policy automation via REST API.",
   "repository": {
-    "url": "https://github.com/wyre-technology/action1-mcp",
+    "url": "https://github.com/WYRE-AI/action1-mcp",
     "source": "github"
   },
   "version": "0.0.0",
-  "websiteUrl": "https://github.com/wyre-technology/action1-mcp",
+  "websiteUrl": "https://github.com/WYRE-AI/action1-mcp",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/wyre-technology/action1-mcp:0.0.0",
+      "identifier": "ghcr.io/wyre-ai/action1-mcp:0.0.0",
       "transport": {
         "type": "stdio"
       },
