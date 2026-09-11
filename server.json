@@ -32,11 +32,11 @@
         },
         {
           "name": "ACTION1_REGION",
-          "description": "Action1 hosting region, which selects the API host: NorthAmerica (app.action1.com), Europe (app.eu.action1.com), AsiaPacific (app.ap.action1.com), or Australia (app.au.action1.com).",
+          "description": "Action1 hosting region, which selects the API host: NorthAmerica (app.action1.com), NorthAmerica-2 (app.na-2.action1.com), Europe (app.eu.action1.com), or Australia (app.au.action1.com).",
           "isRequired": false,
           "default": "NorthAmerica",
           "format": "string",
-          "choices": ["NorthAmerica", "Europe", "AsiaPacific", "Australia"]
+          "choices": ["NorthAmerica", "NorthAmerica-2", "Europe", "Australia"]
         },
         {
           "name": "ACTION1_DEFAULT_ORG_ID",

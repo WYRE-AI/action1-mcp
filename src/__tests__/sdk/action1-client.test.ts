@@ -173,10 +173,11 @@ describe("Action1Client — superseded paths must never reappear", () => {
 });
 
 describe("Action1Client — region hosts", () => {
+  /** Verified against the official OpenAPI `servers` array and live DNS. */
   const REGIONS: Array<[Action1Region, string]> = [
     ["NorthAmerica", "app.action1.com"],
+    ["NorthAmerica-2", "app.na-2.action1.com"],
     ["Europe", "app.eu.action1.com"],
-    ["AsiaPacific", "app.ap.action1.com"],
     ["Australia", "app.au.action1.com"],
   ];
 
@@ -186,10 +187,32 @@ describe("Action1Client — region hosts", () => {
     expect(resourceUrl()).toBe(`https://${host}/api/3.0/organizations`);
   });
 
+  it("accepts the vendor's NA-2 shorthand for NorthAmerica-2", async () => {
+    await makeClient({ region: "NA-2" as Action1Region }).listOrganizations();
+
+    expect(resourceUrl()).toBe("https://app.na-2.action1.com/api/3.0/organizations");
+  });
+
   it("rejects an unknown region at construction time", () => {
     expect(() => makeClient({ region: "Mars" as Action1Region })).toThrow(
       /Unknown Action1 region/,
     );
+  });
+
+  /**
+   * app.ap.action1.com is NXDOMAIN — it does not exist and never did. Selecting
+   * it used to fail with an opaque DNS error deep inside the first tool call.
+   */
+  it("rejects the retired AsiaPacific region with an actionable error", () => {
+    expect(() => makeClient({ region: "AsiaPacific" as Action1Region })).toThrow(
+      /AsiaPacific was removed/,
+    );
+  });
+
+  it("never routes AsiaPacific to Australia (data residency)", () => {
+    // Silently remapping would move customer data across a residency boundary.
+    expect(() => makeClient({ region: "AsiaPacific" as Action1Region })).toThrow();
+    expect(calls).toHaveLength(0);
   });
 });
 

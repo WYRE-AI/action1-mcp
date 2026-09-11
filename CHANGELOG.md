@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **Region hosts corrected.** The `AsiaPacific` region pointed at `app.ap.action1.com`, which does
+  not exist — the name is NXDOMAIN and is absent from Action1's official OpenAPI `servers` list,
+  from PSAction1's `Action1.Hosts.ps1`, and from `Set-Action1Region`'s accepted values. Selecting it
+  failed with an opaque DNS error on the first tool call. It has been removed, and the real
+  `NorthAmerica-2` region (`app.na-2.action1.com`, verified live) added in its place, along with the
+  vendor's `NA-2` shorthand. `AsiaPacific` is deliberately **not** remapped to Australia: that would
+  move customer data across a residency boundary without consent, so it now raises an explicit error
+  naming the valid regions. Australia remains Action1's only Asia-Pacific-area data centre.
 - `server.json` now advertises the credential environment variables the runtime actually reads
   (`ACTION1_API_KEY`, `ACTION1_SECRET`, `ACTION1_REGION`, `ACTION1_DEFAULT_ORG_ID`). It previously
   listed `ACTION1_CLIENT_ID`, `ACTION1_CLIENT_SECRET`, `ACTION1_TENANT` and `ACTION1_BASE_URL`,

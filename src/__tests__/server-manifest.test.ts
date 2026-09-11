@@ -79,16 +79,20 @@ describe("server.json credential env vars", () => {
     expect(byName("ACTION1_DEFAULT_ORG_ID")?.isRequired).toBeFalsy();
   });
 
-  it("offers the four supported regions, defaulting to NorthAmerica", () => {
+  it("offers the four real regions, defaulting to NorthAmerica", () => {
     const region = byName("ACTION1_REGION");
 
     expect(region?.default).toBe("NorthAmerica");
     expect(region?.choices).toEqual([
       "NorthAmerica",
+      "NorthAmerica-2",
       "Europe",
-      "AsiaPacific",
       "Australia",
     ]);
+  });
+
+  it("does not offer AsiaPacific, whose host does not exist", () => {
+    expect(byName("ACTION1_REGION")?.choices).not.toContain("AsiaPacific");
   });
 });
 
