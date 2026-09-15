@@ -200,14 +200,17 @@ describe("MCP Apps device card", () => {
   });
 
   describe("action1_get_endpoint result (card attachment is best-effort)", () => {
-    it("attaches _card to the JSON payload without altering the record", async () => {
+    it("attaches _card to the structured payload without altering the record", async () => {
       const getEndpoint = vi.fn().mockResolvedValue({ id: "e1", name: "host-a" });
       vi.spyOn(clientModule, "getClient").mockReturnValue({ getEndpoint } as never);
 
       const result = await endpointsHandler.handle("action1_get_endpoint", {
         endpoint_id: "e1",
       });
-      const body = JSON.parse(result.content[0].text);
+      // SEP-1865: content is now a short text summary; the full payload
+      // (including _card) lives in structuredContent.
+      expect(result.content[0].text).toBe('Retrieved endpoint "host-a".');
+      const body = result.structuredContent as Record<string, unknown>;
       expect(body).toMatchObject({ id: "e1", name: "host-a" });
       expect(body._card).toEqual({ id: "e1", name: "host-a" });
     });
@@ -219,7 +222,7 @@ describe("MCP Apps device card", () => {
       const result = await endpointsHandler.handle("action1_get_endpoint", {
         endpoint_id: "e1",
       });
-      expect(JSON.parse(result.content[0].text)).toEqual({ unexpected: "shape" });
+      expect(result.structuredContent).toEqual({ unexpected: "shape" });
     });
 
     it("survives non-object payloads (card never breaks the tool result)", async () => {
@@ -229,7 +232,7 @@ describe("MCP Apps device card", () => {
       const result = await endpointsHandler.handle("action1_get_endpoint", {
         endpoint_id: "e1",
       });
-      expect(JSON.parse(result.content[0].text)).toEqual(["not", "an", "object"]);
+      expect(result.structuredContent).toEqual(["not", "an", "object"]);
     });
   });
 });

@@ -11,7 +11,10 @@ export interface DomainHandler {
   handle(
     toolName: string,
     args: Record<string, unknown>,
-  ): Promise<{ content: Array<{ type: "text"; text: string }> }>;
+  ): Promise<{
+    content: Array<{ type: "text"; text: string }>;
+    structuredContent?: Record<string, unknown>;
+  }>;
 }
 
 export function isDomainName(s: string): s is DomainName {

@@ -87,19 +87,25 @@ export const endpointsHandler: DomainHandler = {
       // MCP Apps: attach the normalized card payload the ui:// device card
       // renders from. Best-effort — any failure just means no UI surface,
       // never a failed tool result.
-      let payload: unknown = endpoint;
+      let payload: Record<string, unknown> | unknown = endpoint;
+      let card: ReturnType<typeof buildDeviceCard> = null;
       try {
         if (endpoint && typeof endpoint === "object" && !Array.isArray(endpoint)) {
           const record = endpoint as Record<string, unknown>;
-          const card = buildDeviceCard(record);
+          card = buildDeviceCard(record);
           if (card) payload = { ...record, _card: card };
         }
       } catch {
         payload = endpoint;
       }
 
+      // SEP-1865: content/structuredContent separation — a short text
+      // summary goes in `content`, the full record (including _card)
+      // moves to `structuredContent`. No fields are dropped, only relocated.
+      const displayName = card?.name ?? endpointId;
       return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text", text: `Retrieved endpoint "${displayName}".` }],
+        structuredContent: payload as Record<string, unknown>,
       };
     }
 

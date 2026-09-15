@@ -107,7 +107,18 @@ async function dispatchTool(
 function buildServer(): Server {
   const server = new Server(
     { name: "action1-mcp", version: "0.1.0" },
-    { capabilities: { tools: {}, resources: {} } },
+    {
+      capabilities: {
+        tools: {},
+        resources: {},
+        // MCP Apps (SEP-1865): explicitly declare the extension capability so
+        // clients can negotiate UI support without inferring it from the
+        // presence of ui:// resources (SEP-1724 extensions mechanism).
+        extensions: {
+          "io.modelcontextprotocol/ui": {},
+        },
+      },
+    },
   );
   // MCP Apps (SEP-1865): serves the ui:// device-card resource.
   registerResourceHandlers(server);
