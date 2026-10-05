@@ -93,7 +93,9 @@ describe("endpoints domain", () => {
       });
 
       expect(getEndpoint).toHaveBeenCalledWith("e1", { orgId: "org-1" });
-      const body = JSON.parse(result.content[0].text);
+      // SEP-1865: content is now a short text summary; the full record
+      // (including _card) lives in structuredContent.
+      const body = result.structuredContent as Record<string, unknown>;
       expect(body).toMatchObject({ id: "e1", hostname: "host-a" });
       // MCP Apps: the normalized _card is additive (see mcp-apps.test.ts).
       expect(body._card).toMatchObject({ id: "e1", name: "host-a" });
