@@ -15,17 +15,51 @@
  *   returns: { access_token (JWT, 1h), refresh_token, expires_in, token_type: 'bearer' }
  *
  * Region routing: Action1 hosts per-region. Base URL is derived from region
- * because the token endpoint and resource endpoints share the same host.
+ * because the token endpoint and resource endpoints share the same host — never
+ * hardcode app.action1.com for the token exchange.
+ *
+ * Resource paths (read-only v1). Action1's gateway answers an unknown route with
+ * 403, not 404, so a wrong path here presents as a permissions problem and is
+ * easy to misdiagnose — see src/__tests__/sdk/action1-client.test.ts, which pins
+ * every one of these:
+ *   GET /api/3.0/organizations
+ *   GET /api/3.0/endpoints/managed/<org>          — list endpoints
+ *   GET /api/3.0/endpoints/managed/<org>/<eid>    — endpoint detail
+ *   GET /api/3.0/updates/<org>                    — missing updates
+ *   GET /api/3.0/policies/instances/<org>         — automations / policies
+ *
+ * NOTE on the last one: Action1 renamed this resource. The current OpenAPI
+ * reference documents it as /api/3.0/automations/instances/<org>, though its
+ * operationId is still literally `policies_instances_orgId_get`. The vendor's
+ * own PSAction1 module still calls /policies/instances/<org>, which remains a
+ * live alias and is what we have verified end to end. Migrating to the
+ * /automations/ spelling needs live-tenant verification first.
  */
 
-const REGION_HOSTS: Record<string, string> = {
+/**
+ * Action1's regional API hosts, as listed in the official OpenAPI `servers`
+ * array and in PSAction1's Action1.Hosts.ps1.
+ *
+ * There is deliberately no "AsiaPacific" entry: `app.ap.action1.com` does not
+ * exist (NXDOMAIN) and never did. It was carried here as a plausible-looking
+ * guess, so selecting that region failed with an opaque DNS error. Australia is
+ * Action1's only Asia-Pacific-area data centre. AsiaPacific is NOT silently
+ * remapped to Australia — that would move customer data across a residency
+ * boundary without consent, so an explicit error is the correct behaviour.
+ */
+const REGION_HOSTS = {
   NorthAmerica: "app.action1.com",
+  "NorthAmerica-2": "app.na-2.action1.com",
   Europe: "app.eu.action1.com",
-  AsiaPacific: "app.ap.action1.com",
   Australia: "app.au.action1.com",
-};
+} as const;
 
 export type Action1Region = keyof typeof REGION_HOSTS;
+
+/** Shorthand accepted by the vendor's own Set-Action1Region ValidateSet. */
+const REGION_ALIASES: Record<string, Action1Region> = {
+  "NA-2": "NorthAmerica-2",
+};
 
 export interface Action1ClientOptions {
   apiKey: string;
@@ -45,9 +79,16 @@ export class Action1Client {
   private token: TokenState | null = null;
 
   constructor(private readonly opts: Action1ClientOptions) {
-    const host = REGION_HOSTS[opts.region];
+    const region = REGION_ALIASES[opts.region] ?? opts.region;
+    const host = REGION_HOSTS[region];
     if (!host) {
-      throw new Error(`Unknown Action1 region: ${opts.region}`);
+      throw new Error(
+        `Unknown Action1 region: ${opts.region}. Valid regions are ` +
+          `${Object.keys(REGION_HOSTS).join(", ")}. ` +
+          `(AsiaPacific was removed — app.ap.action1.com does not exist. ` +
+          `Australia is Action1's Asia-Pacific-area data centre, but switching ` +
+          `to it changes where your data resides, so set it deliberately.)`,
+      );
     }
     this.baseUrl = `https://${host}`;
   }

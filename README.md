@@ -40,7 +40,7 @@ Install via the MCPB bundle from the [latest release](https://github.com/WYRE-AI
 Required credentials (created in Action1 → Settings → API Credentials, **non-recoverable on creation — copy immediately**):
 - API Key (Client ID)
 - Secret
-- Region (`NorthAmerica` default; also `Europe`, `AsiaPacific`, `Australia`)
+- Region (`NorthAmerica` default; also `NorthAmerica-2`, `Europe`, `Australia`)
 - Optional default organization id (for single-tenant use)
 
 ### Stdio (direct)
