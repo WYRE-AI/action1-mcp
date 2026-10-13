@@ -20,6 +20,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { createHmac } from 'node:crypto';
+import { startHttp } from '../index.js';
 
 const TEST_PORT = 47004;
 const TEST_SECRET = 'test-s2s-guard-ordering-secret-do-not-use-in-prod';
@@ -61,9 +62,13 @@ beforeAll(async () => {
   }) as typeof fetch;
 
   process.env.MCP_TRANSPORT = 'http';
+  process.env.MCP_HTTP_HOST = '127.0.0.1';
+  process.env.MCP_HTTP_PORT = String(TEST_PORT);
   process.env.PORT = String(TEST_PORT);
   process.env.CONDUIT_S2S_SECRET = TEST_SECRET;
-  await import('../index.js');
+  delete process.env.MCP_ALLOW_INSECURE_DEV;
+  delete process.env.AUTH_MODE;
+  await startHttp();
   await waitForServerReady();
 });
 

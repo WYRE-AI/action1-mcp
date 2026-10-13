@@ -16,9 +16,17 @@
  *
  * Credentials (gateway mode, AUTH_MODE=gateway): from request headers
  *   X-Action1-API-Key, X-Action1-Secret, X-Action1-Region, X-Action1-Default-Org-Id
+ *   Gateway mode never falls back to ACTION1_* env credentials.
+ *
+ * HTTP transport refuses to start unless CONDUIT_S2S_SECRET is a real secret.
+ * Known placeholders are rejected. MCP_ALLOW_INSECURE_DEV=1 is a local-only
+ * escape hatch: it logs a warning, skips X-Gateway-S2S, and binds 127.0.0.1 only.
+ * A configured secret honors MCP_HTTP_HOST (default 127.0.0.1 when unset).
+ * /health stays unauthenticated and does not read credentials.
+ * stdio does not use S2S auth.
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -140,12 +148,101 @@ function buildServer(): Server {
   return server;
 }
 
+/** Hosts the insecure-dev bypass is allowed to bind. Anything else is refused. */
+const LOOPBACK_HOST = "127.0.0.1";
+
+/**
+ * Public example values. A copied placeholder must not verify as a real secret,
+ * or anyone who knows the example can forge X-Gateway-S2S.
+ */
+const KNOWN_PLACEHOLDER_SECRETS = new Set([
+  "replace-with-a-real-secret",
+  "your-s2s-secret",
+  "your-secret",
+  "changeme",
+  "change-me",
+  "placeholder",
+  "secret",
+  "example",
+  "replace-me",
+  "s2s-secret",
+]);
+
+function refuseStart(message: string): never {
+  console.error(message);
+  process.exit(1);
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase().replace(/^\[(.+)\]$/, "$1");
+  return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1";
+}
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Secret for X-Gateway-S2S. Read at HTTP startup, not module load, and never logged.
+ * Empty is fail-closed unless MCP_ALLOW_INSECURE_DEV=1. A known placeholder always
+ * refuses to start, including when that flag is set.
+ */
+function resolveHttpS2s(): { secret: string; insecureDev: boolean } {
+  const raw = (process.env.CONDUIT_S2S_SECRET ?? "").trim();
+  if (raw && KNOWN_PLACEHOLDER_SECRETS.has(raw.toLowerCase())) {
+    refuseStart(
+      "Refusing to start HTTP transport: CONDUIT_S2S_SECRET is a known placeholder. " +
+        "Generate a secret with `openssl rand -hex 32` and set CONDUIT_S2S_SECRET to that value.",
+    );
+  }
+  if (raw) return { secret: raw, insecureDev: false };
+
+  if (process.env.MCP_ALLOW_INSECURE_DEV === "1") {
+    console.error(
+      "SECURITY WARNING: CONDUIT_S2S_SECRET is empty and MCP_ALLOW_INSECURE_DEV=1. " +
+        "HTTP MCP is not enforcing X-Gateway-S2S and is limited to loopback (127.0.0.1). " +
+        "Do not use this outside local development.",
+    );
+    return { secret: "", insecureDev: true };
+  }
+
+  refuseStart(
+    "Refusing to start HTTP transport: CONDUIT_S2S_SECRET is empty. " +
+      "Set CONDUIT_S2S_SECRET, or set MCP_ALLOW_INSECURE_DEV=1 for local development only.",
+  );
+}
+
+/**
+ * No secret (insecure-dev bypass) always binds 127.0.0.1. A non-loopback
+ * MCP_HTTP_HOST is refused rather than honored. A configured secret honors
+ * MCP_HTTP_HOST, and still defaults to 127.0.0.1 when that variable is unset.
+ */
+function resolveBindHost(insecureDev: boolean): string {
+  const configured = (process.env.MCP_HTTP_HOST ?? "").trim();
+  if (!insecureDev) return configured || LOOPBACK_HOST;
+  if (configured === "" || isLoopbackHost(configured)) return LOOPBACK_HOST;
+  refuseStart(
+    "Refusing to start HTTP transport: MCP_ALLOW_INSECURE_DEV=1 without CONDUIT_S2S_SECRET " +
+      `only binds 127.0.0.1. MCP_HTTP_HOST=${configured} is not loopback. ` +
+      "Unset MCP_HTTP_HOST or set it to 127.0.0.1.",
+  );
+}
+
+function resolveHttpPort(): number {
+  const raw = (process.env.MCP_HTTP_PORT || process.env.PORT || "8080").trim();
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    refuseStart(`Refusing to start HTTP transport: invalid HTTP port "${raw}".`);
+  }
+  return port;
+}
+
 function credentialsFromHeaders(req: IncomingMessage): Action1Credentials | null {
-  const apiKey = req.headers["x-action1-api-key"];
-  const secret = req.headers["x-action1-secret"];
+  const apiKey = headerValue(req.headers["x-action1-api-key"]);
+  const secret = headerValue(req.headers["x-action1-secret"]);
   const region = req.headers["x-action1-region"];
   const defaultOrgId = req.headers["x-action1-default-org-id"];
-  if (typeof apiKey !== "string" || typeof secret !== "string") return null;
+  if (!apiKey || !secret) return null;
   // cleanCredential strips blank / unresolved `${user_config.X}` placeholders so
   // a blank optional field reads as absent (region falls back, org id stays unset).
   return {
@@ -157,10 +254,13 @@ function credentialsFromHeaders(req: IncomingMessage): Action1Credentials | null
   };
 }
 
-async function startHttp(): Promise<void> {
-  const port = Number(process.env.PORT ?? 8080);
+export async function startHttp(): Promise<HttpServer> {
+  const { secret: s2sSecret, insecureDev } = resolveHttpS2s();
+  const host = resolveBindHost(insecureDev);
+  const port = resolveHttpPort();
+  const isGatewayMode = process.env.AUTH_MODE === "gateway";
 
-  createServer((req: IncomingMessage, res: ServerResponse) => {
+  const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     // Liveness probe: must answer 200 unconditionally, before any MCP/credential
     // handling — the ACA probe GETs /health with no credentials or Accept
     // headers, and anything non-2xx crash-loops the container.
@@ -179,24 +279,23 @@ async function startHttp(): Promise<void> {
     // Gateway S2S verification (gateway#377 parity). Runs before any
     // credential extraction — see src/s2s-verify.ts. There's no separate
     // /mcp route check in this server (everything past /health is MCP
-    // traffic), so this guard covers all of it. Empty secret means S2S
-    // enforcement isn't provisioned for this vendor yet, so we don't call
-    // verifyS2sHeader at all (dark-by-default).
-    const s2sSecret = process.env.CONDUIT_S2S_SECRET ?? "";
-    if (s2sSecret) {
-      const s2sHeader = req.headers[S2S_HEADER] as string | undefined;
-      if (!verifyS2sHeader(s2sHeader, s2sSecret)) {
-        console.error("action1-mcp: rejected request with missing/invalid gateway S2S header");
-        res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: { code: -32001, message: "Unauthorized: missing or invalid gateway S2S authentication header" },
-            id: null,
-          }),
-        );
-        return;
-      }
+    // traffic), so this guard covers all of it. An empty secret is only
+    // reachable when MCP_ALLOW_INSECURE_DEV=1; startup refuses otherwise.
+    // A configured secret is always enforced. The secret value is never logged.
+    if (s2sSecret && !verifyS2sHeader(headerValue(req.headers[S2S_HEADER]), s2sSecret)) {
+      console.error("action1-mcp: rejected request with missing/invalid X-Gateway-S2S header");
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: {
+            code: -32001,
+            message: "Unauthorized: missing or invalid X-Gateway-S2S header",
+          },
+          id: null,
+        }),
+      );
+      return;
     }
 
     // Build a FRESH Server + Transport per request in stateless mode.
@@ -223,6 +322,24 @@ async function startHttp(): Promise<void> {
 
     const run = async (): Promise<void> => {
       const creds = credentialsFromHeaders(req);
+      // Gateway mode: vendor credentials must arrive on every request.
+      // Falling through would resolve ACTION1_* from the process environment,
+      // which is not request-scoped.
+      if (isGatewayMode && !creds) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32001,
+              message:
+                "Unauthorized: missing required gateway credential headers X-Action1-API-Key and X-Action1-Secret",
+            },
+            id: null,
+          }),
+        );
+        return;
+      }
       // Build the fresh server+transport INSIDE the credential context so
       // getClient() resolves per-request credentials from AsyncLocalStorage.
       if (creds) {
@@ -247,9 +364,18 @@ async function startHttp(): Promise<void> {
         );
       }
     });
-  }).listen(port, () => {
-    console.error(`action1-mcp HTTP listening on :${port}`);
   });
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(port, host, () => {
+      httpServer.off("error", reject);
+      console.error(`action1-mcp HTTP listening on ${host}:${port}`);
+      resolve();
+    });
+  });
+
+  return httpServer;
 }
 
 async function startStdio(): Promise<void> {
@@ -268,7 +394,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error("action1-mcp fatal:", err);
-  process.exit(1);
-});
+// Vitest imports this module to call startHttp. Skip the CLI entrypoint
+// there. `node dist/index.js` still starts stdio or HTTP.
+if (process.env.VITEST !== "true") {
+  main().catch((err) => {
+    console.error("action1-mcp fatal:", err);
+    process.exit(1);
+  });
+}

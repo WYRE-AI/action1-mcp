@@ -31,8 +31,13 @@ USER mcp
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Bind every interface inside the container. Host publish is loopback in
+# docker-compose. Startup still refuses to run without a real CONDUIT_S2S_SECRET.
+# MCP_ALLOW_INSECURE_DEV=1 refuses to start while this host is 0.0.0.0; that
+# bypass only binds 127.0.0.1. Gateway mode reads vendor credentials from
+# request headers and never falls back to image env credentials.
 ENV MCP_TRANSPORT=http
 ENV MCP_HTTP_PORT=8080
 ENV MCP_HTTP_HOST=0.0.0.0
-ENV AUTH_MODE=env
+ENV AUTH_MODE=gateway
 CMD ["node", "dist/index.js"]
