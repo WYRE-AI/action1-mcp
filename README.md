@@ -53,24 +53,83 @@ ACTION1_DEFAULT_ORG_ID=org-... \
 npx -y github:WYRE-AI/action1-mcp
 ```
 
-### HTTP (gateway mode)
+### HTTP
+
+`CONDUIT_S2S_SECRET` is required. If it is empty or a known placeholder (`changeme`, `replace-with-a-real-secret`, and similar), the HTTP server logs an error and exits non-zero. It never prints the secret. Generate one with `openssl rand -hex 32`.
+
+`MCP_HTTP_HOST` defaults to `127.0.0.1` when unset. Set `0.0.0.0` only when `CONDUIT_S2S_SECRET` is set. The container image does that and sets `AUTH_MODE=gateway`. `MCP_HTTP_PORT` (or `PORT`) selects the port and defaults to `8080`.
+
+`MCP_ALLOW_INSECURE_DEV=1` starts HTTP without `CONDUIT_S2S_SECRET`, logs a warning, skips `X-Gateway-S2S`, and binds `127.0.0.1` only. A non-loopback `MCP_HTTP_HOST` (including `0.0.0.0`) refuses to start. A placeholder secret is still rejected. Local development only.
+
+`/health` stays unauthenticated and does not read credentials. The stdio transport does not use `CONDUIT_S2S_SECRET`.
+
+#### X-Gateway-S2S
+
+Every HTTP request except `/health` must include `X-Gateway-S2S` when a secret is configured. The value is `t=<unix seconds>,v1=<hex>`, where the hex is HMAC-SHA256 of the literal string `t=<unix seconds>` keyed with `CONDUIT_S2S_SECRET` (64 lowercase hex characters). The timestamp must be within 300 seconds of the server clock. A missing or invalid header is HTTP 401, before vendor credentials are read.
 
 ```bash
-MCP_TRANSPORT=http PORT=8080 AUTH_MODE=gateway \
-  docker run -p 8080:8080 ghcr.io/wyre-ai/action1-mcp:latest
+TS=$(date +%s)
+SIG=$(printf 't=%s' "$TS" | openssl dgst -sha256 -hmac "$CONDUIT_S2S_SECRET" -hex | awk '{print $NF}')
+curl -sS http://127.0.0.1:8080/ \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "X-Gateway-S2S: t=${TS},v1=${SIG}" \
+  -H "X-Action1-API-Key: $ACTION1_API_KEY" \
+  -H "X-Action1-Secret: $ACTION1_SECRET" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-Per-request credentials via headers:
+#### Gateway mode (`AUTH_MODE=gateway`)
+
+The Docker image and Compose file default to gateway mode. Every request must include:
+
 - `X-Action1-API-Key`
 - `X-Action1-Secret`
-- `X-Action1-Region`
-- `X-Action1-Default-Org-Id`
+- `X-Action1-Region` (optional)
+- `X-Action1-Default-Org-Id` (optional)
+
+A request missing the API key or secret gets `401` and does not fall back to `ACTION1_API_KEY` / `ACTION1_SECRET` in the process environment. Those headers are the only credential source for that request.
+
+```bash
+docker run \
+  -e CONDUIT_S2S_SECRET="$CONDUIT_S2S_SECRET" \
+  -p 127.0.0.1:8080:8080 \
+  ghcr.io/wyre-ai/action1-mcp:latest
+```
+
+Compose refuses to start when `CONDUIT_S2S_SECRET` is unset, publishes `127.0.0.1:8080:8080`, and does not pass static Action1 credentials into the container:
+
+```bash
+CONDUIT_S2S_SECRET="$CONDUIT_S2S_SECRET" docker compose up
+```
+
+#### Single-tenant HTTP (`AUTH_MODE=env`)
+
+Requests still require a valid `X-Gateway-S2S` header. Vendor credentials come from `ACTION1_API_KEY` and `ACTION1_SECRET` when the request does not carry those headers.
+
+```bash
+docker run \
+  -e CONDUIT_S2S_SECRET="$CONDUIT_S2S_SECRET" \
+  -e AUTH_MODE=env \
+  -e ACTION1_API_KEY="$ACTION1_API_KEY" \
+  -e ACTION1_SECRET="$ACTION1_SECRET" \
+  -e ACTION1_REGION=NorthAmerica \
+  -p 127.0.0.1:8080:8080 \
+  ghcr.io/wyre-ai/action1-mcp:latest
+```
+
+Local HTTP without a secret is development-only. It binds `127.0.0.1` and logs a warning:
+
+```bash
+MCP_TRANSPORT=http MCP_ALLOW_INSECURE_DEV=1 npm start
+```
 
 ## Architecture
 
 ```
 src/
-├── index.ts                  # stdio + HTTP transports, tool dispatch
+├── index.ts                  # stdio + HTTP transports, tool dispatch, S2S startup
+├── s2s-verify.ts             # X-Gateway-S2S HMAC-SHA256 check
 ├── card.builder.ts           # MCP Apps device-card normalization + brand injection
 ├── resources.ts              # resources/list + resources/read (ui:// device card)
 ├── generated/
