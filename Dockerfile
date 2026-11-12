@@ -25,7 +25,8 @@ COPY --from=builder /app/package.json ./
 # GHSA-5xrq-8626-4rwp on vitest, triaged 2026-08-03) would otherwise show up
 # as present in the production image even though nothing here ever invokes
 # it.
-RUN npm prune --omit=dev && npm cache clean --force
+# The runtime only executes node; drop the bundled npm CLI (and its CVE-prone deps)
+RUN npm prune --omit=dev && npm cache clean --force && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 USER mcp
 EXPOSE 8080
